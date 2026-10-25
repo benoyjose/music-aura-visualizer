@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build outputs & Standalone Executables
+dist/
+build/
+*.exe
+!bin/ffmpeg.exe
+
+# Large binary files & video exports
+*.mp4
+*.webm
+*.mov
+trap_nation_official_render.mp4
+bin/
+
+# Temporary files & logs
+*.log
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/

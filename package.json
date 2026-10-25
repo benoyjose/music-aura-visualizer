@@ -1,0 +1,31 @@
+{
+  "name": "music-aura-visualizer",
+  "version": "1.0.0",
+  "description": "Professional 8K Multi-Resolution Audio Music Aura Visualizer (Trap Nation / Drop Nation Style)",
+  "main": "src/main/index.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node tests/test_export.js",
+    "package:win": "node scripts/package_windows.js",
+    "generate-demo": "python generate_demo_assets.py"
+  },
+  "keywords": [
+    "spectrometer",
+    "audio-visualizer",
+    "trap-nation",
+    "drop-nation",
+    "8k-video",
+    "music-video-generator",
+    "ffmpeg",
+    "electron"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^45.0.0",
+    "electron-packager": "^17.1.2"
+  },
+  "dependencies": {
+    "googleapis": "^188.0.0"
+  }
+}

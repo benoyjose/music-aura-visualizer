@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Spectrometer Studio Loading</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      user-select: none;
+    }
+    body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    .splash-card {
+      width: 440px;
+      height: 480px;
+      background: radial-gradient(circle at 50% 35%, #181c2b 0%, #090b12 85%, #05060a 100%);
+      border: 1px solid rgba(255, 215, 80, 0.35);
+      border-radius: 24px;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.9), 0 0 50px rgba(255, 180, 0, 0.18);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .splash-card::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle, rgba(160, 60, 255, 0.1) 0%, transparent 60%);
+      pointer-events: none;
+      animation: rotateAura 12s linear infinite;
+    }
+    @keyframes rotateAura {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    .logo-container {
+      position: relative;
+      width: 200px;
+      height: 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 24px;
+    }
+    .halo-ring {
+      position: absolute;
+      inset: -12px;
+      border-radius: 50%;
+      border: 2px dashed rgba(255, 200, 50, 0.4);
+      animation: spinHalo 18s linear infinite;
+    }
+    .halo-ring-inner {
+      position: absolute;
+      inset: -4px;
+      border-radius: 50%;
+      border: 1px solid rgba(180, 80, 255, 0.5);
+      box-shadow: 0 0 25px rgba(255, 190, 0, 0.3), inset 0 0 20px rgba(180, 60, 255, 0.25);
+      animation: spinHaloRev 9s linear infinite;
+    }
+    @keyframes spinHalo {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    @keyframes spinHaloRev {
+      from { transform: rotate(360deg); }
+      to { transform: rotate(0deg); }
+    }
+    .logo-img {
+      width: 190px;
+      height: 190px;
+      border-radius: 50%;
+      object-fit: cover;
+      animation: logoPulse 2.8s ease-in-out infinite;
+      box-shadow: 0 0 35px rgba(255, 185, 20, 0.45);
+      z-index: 2;
+    }
+    @keyframes logoPulse {
+      0%, 100% {
+        transform: scale(1);
+        filter: drop-shadow(0 0 16px rgba(255, 210, 60, 0.6));
+      }
+      50% {
+        transform: scale(1.045);
+        filter: drop-shadow(0 0 32px rgba(255, 170, 0, 0.95)) drop-shadow(0 0 50px rgba(160, 50, 255, 0.5));
+      }
+    }
+    .title {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      background: linear-gradient(135deg, #ffffff 20%, #ffd700 60%, #ff8800 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 6px;
+      z-index: 2;
+    }
+    .subtitle {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      color: rgba(220, 225, 240, 0.65);
+      text-transform: uppercase;
+      margin-bottom: 28px;
+      z-index: 2;
+    }
+    .progress-bar-wrap {
+      width: 260px;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 999px;
+      overflow: hidden;
+      position: relative;
+      margin-bottom: 12px;
+      z-index: 2;
+    }
+    .progress-bar-fill {
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, #ff0055, #ffaa00, #00ffcc, #ff0055);
+      background-size: 300% 100%;
+      animation: shimmerBar 1.8s linear infinite;
+      border-radius: 999px;
+    }
+    @keyframes shimmerBar {
+      0% { background-position: 100% 0; }
+      100% { background-position: 0% 0; }
+    }
+    .status-text {
+      font-size: 11.5px;
+      color: #ffd24d;
+      font-weight: 500;
+      letter-spacing: 0.5px;
+      z-index: 2;
+    }
+  </style>
+</head>
+<body>
+  <div class="splash-card">
+    <div class="logo-container">
+      <div class="halo-ring"></div>
+      <div class="halo-ring-inner"></div>
+      <img src="./assets/logo.png" alt="Spectrometer Studio" class="logo-img" />
+    </div>
+    <div class="title">Spectrometer Studio</div>
+    <div class="subtitle">DirectX 12 • 8K Audio Visualizer</div>
+    <div class="progress-bar-wrap">
+      <div class="progress-bar-fill"></div>
+    </div>
+    <div class="status-text" id="statusMsg">Initializing GPU Hardware Acceleration…</div>
+  </div>
+  <script>
+    const msgs = [
+      "Initializing GPU Hardware Acceleration…",
+      "Compiling WebGL 2.0 Shaders…",
+      "Loading Audio Spectral Engines…",
+      "Starting Pure Windows Workstation…"
+    ];
+    let idx = 0;
+    setInterval(() => {
+      idx = (idx + 1) % msgs.length;
+      const el = document.getElementById("statusMsg");
+      if (el) el.textContent = msgs[idx];
+    }, 450);
+  </script>
+</body>
+</html>
