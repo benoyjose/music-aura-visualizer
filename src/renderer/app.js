@@ -1897,7 +1897,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       // Load demo logo
       const logoBase64 = await window.spectrometerAPI.readFileAsBase64(appPaths.demoLogo);
       state.logoImage = await loadImageFromBase64(logoBase64);
-      document.getElementById('logoFileName').textContent = 'trap-nation-official.png (Official Emblem)';
+      document.getElementById('logoFileName').textContent = 'demo-logo.png (Default Logo)';
 
       // Populate demo synced lyrics
       const demoLrc = "[00:03.00] In the dark of the night\n[00:07.50] We find our guiding light\n[00:11.00] Bass reverberates into the sky\n[00:15.50] Feel the soundwave flying high\n[00:20.00] Never looking back again\n[00:24.50] Pure energy till the end\n[00:29.00] We are unstoppable!";
