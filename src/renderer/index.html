@@ -2496,7 +2496,8 @@ void main() {
       let cur = new Float32Array(0),
         hist = [],
         bass = 0,
-        bassPeak = 0;
+        bassPeak = 0,
+        musicEnergy = 0;
       function analyse(dt) {
         const n = params.bands | 0;
         if (cur.length !== n) {
@@ -2505,6 +2506,7 @@ void main() {
         }
         const raw = new Float32Array(n);
         let bassRaw = 0;
+        let bandSum = 0;
         if (analyser && clock.playing()) {
           analyser.smoothingTimeConstant = params.smooth;
           analyser.getByteFrequencyData(freq);
@@ -2527,6 +2529,7 @@ void main() {
               clamp((v / 255) * params.sens * (1 + (params.tilt * i) / n)),
               params.power,
             );
+            bandSum += raw[i];
           }
           const bEnd = Math.max(1, Math.round(params.bassHz / binHz));
           for (let j = 1; j <= bEnd; j++) bassRaw += freq[j];
@@ -2553,6 +2556,18 @@ void main() {
           Math.min(1, dt * 60);
         // kick is relative to the song's recent bass peak, so it adapts to any mix loudness
         bassPeak = Math.max(bass, bassPeak * Math.pow(0.995, dt * 60), 0.05);
+
+        // Continuous musical envelope tracking:
+        // Quickly catches audio onset, gracefully decays to 0 when audio fades out or pauses
+        const avgBand = n > 0 ? bandSum / n : 0;
+        const instantEnergy = (analyser && clock.playing())
+          ? Math.min(1.0, (avgBand * 3.5) + (bassRaw * 1.6))
+          : 0;
+        const isRising = instantEnergy > musicEnergy;
+        const rate = isRising ? Math.min(1, dt * 10) : Math.min(1, dt * 2.2);
+        musicEnergy += (instantEnergy - musicEnergy) * rate;
+        if ((!analyser || !clock.playing()) && musicEnergy < 0.002) musicEnergy = 0;
+
         return clamp((bass / bassPeak - params.thresh) / (1 - params.thresh));
       }
 
@@ -2992,11 +3007,11 @@ void main() {
       // Each line is a 33-point wavy strip, fading in from the tail.
       const wx = new Float32Array(33),
         wy = new Float32Array(33);
-      function windStrips(cx, cy, D, spread, kick, dt, t, burst) {
+      function windStrips(cx, cy, D, spread, kick, dt, t, burst, mSpeed = 1, mAlpha = 1) {
         while (wind.length < params.wCount) wind.push(newWind(true));
         wind.length = params.wCount;
         const speed =
-            params.wSpeed * (1 + kick * params.wBoost) * burst * 0.18 * dt,
+            params.wSpeed * mSpeed * (1 + kick * params.wBoost) * burst * 0.18 * dt,
           proj = spread * 0.35;
         for (const s of wind) {
           s.z -= speed;
@@ -3010,9 +3025,9 @@ void main() {
           const near = 1 - Math.min(1, s.z); // grows 0→1 as the line approaches, like particle size
           const amp = params.wAmp * u * s.a * (0.4 + near),
             k = (params.wWaves * 2 * Math.PI) / len,
-            ph = s.ph + t * params.wWiggle;
+            ph = s.ph + t * params.wWiggle * (0.1 + 0.9 * mSpeed);
           const hw = (params.wWidth * u * (0.5 + near)) / 2,
-            A = params.wAlpha * clamp(near * 2.5);
+            A = params.wAlpha * clamp(near * 2.5) * mAlpha;
           for (let i = 0; i <= 32; i++) {
             const f = i / 32,
               r = r0 + f * len,
@@ -3302,24 +3317,33 @@ void main() {
           cam = camAt(camAngle),
           ringCam = ia ? camAt(camAngle + ia) : cam;
 
+        // Dynamic music response for background elements:
+        // When music fades down or pauses, particles and wind lines gracefully
+        // slow down towards absolute rest and fade out gradually to 0 opacity.
+        const musicFactor = clamp(musicEnergy, 0, 1);
+        const musicSpeed = Math.min(1.0, Math.pow(musicFactor * 1.5, 1.25));
+        const musicAlpha = Math.min(1.0, musicFactor * 1.5);
+
         // particles: fly outward from center (starfield projection) → instances (x, y, size, alpha)
         const spread = Math.max(W, H) * 0.5,
           speed =
-            params.pSpeed * (1 + kick * params.pBoost) * burst * 0.18 * dt;
+            params.pSpeed * musicSpeed * (1 + kick * params.pBoost) * burst * 0.18 * dt;
         inst = grow(inst, particles.length * 4);
         let np = 0;
-        for (const p of particles) {
-          p.z -= speed;
-          const px = cx + (p.x / p.z) * spread * 0.35,
-            py = cy + (p.y / p.z) * spread * 0.35;
-          if (p.z <= 0.02 || Math.hypot(px - cx, py - cy) > D + 50) {
-            Object.assign(p, newParticle(false));
-            continue;
+        if (musicAlpha > 0.002) {
+          for (const p of particles) {
+            p.z -= speed;
+            const px = cx + (p.x / p.z) * spread * 0.35,
+              py = cy + (p.y / p.z) * spread * 0.35;
+            if (p.z <= 0.02 || Math.hypot(px - cx, py - cy) > D + 50) {
+              Object.assign(p, newParticle(false));
+              continue;
+            }
+            inst[np++] = px;
+            inst[np++] = py;
+            inst[np++] = params.pSize * u * p.s * (1.2 / p.z + 1) * 2;
+            inst[np++] = params.pAlpha * clamp((1 - p.z) * 2.5) * fade * musicAlpha;
           }
-          inst[np++] = px;
-          inst[np++] = py;
-          inst[np++] = params.pSize * u * p.s * (1.2 / p.z + 1) * 2;
-          inst[np++] = params.pAlpha * clamp((1 - p.z) * 2.5) * fade;
         }
 
         // wind strips, then the spectrum layers back (most delayed) to front, into one vertex buffer
@@ -3329,7 +3353,9 @@ void main() {
             params.layers * (2 * cur.length * RING_STEPS + 2) * 3,
         );
         gi = 0;
-        windStrips(cx, cy, D, spread, kick, dt, t, burst);
+        if (musicAlpha > 0.002) {
+          windStrips(cx, cy, D, spread, kick, dt, t, burst, musicSpeed, musicAlpha);
+        }
         const windN = gi / 3,
           layers = [];
         const scale = (1 + kick * params.pulse) * is,
@@ -3444,7 +3470,7 @@ void main() {
         }
 
         // 2. Crisp wind lines (isolated from chromatic aberration)
-        if (windN) flat(gl.TRIANGLES, 0, windN, undefined, cam, fade);
+        if (windN) flat(gl.TRIANGLES, 0, windN, undefined, cam, fade * musicAlpha);
 
         // 3. Center logo with dedicated logo chromatic aberration
         syncLogo(t);
@@ -3604,6 +3630,7 @@ void main() {
         hist = [];
         bass = 0;
         bassPeak = 0;
+        musicEnergy = 0;
         drop = 0;
         prevT = 0;
         testDropAt = 0;

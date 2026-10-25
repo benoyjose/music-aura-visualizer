@@ -80,6 +80,7 @@ class ParticleSystem {
     this.particles = [];
     this.maxParticles = 1200;
     this.spawnAccumulator = 0;
+    this.musicEnergy = 0;
     if (typeof document !== 'undefined') {
       this.cachedTintCanvas = document.createElement('canvas');
       this.cachedTintCanvas.width = 60;
@@ -348,16 +349,23 @@ class ParticleSystem {
       rY = 140 * baseScale * this.transform.heightMultiplier;
     }
 
+    // Dynamic music responsiveness
+    const instantAudio = Math.max(kickPulse || 0, bassLevel || 0);
+    const isRising = instantAudio > (this.musicEnergy || 0);
+    const rate = isRising ? Math.min(1, dt * 10) : Math.min(1, dt * 2.2);
+    this.musicEnergy = (this.musicEnergy || 0) + (instantAudio - (this.musicEnergy || 0)) * rate;
+    const musicFactor = Math.min(1.0, (this.musicEnergy || 0) * 1.5);
+
     // Effective birthrate
-    let effBirthrate = this.cell.birthrate;
+    let effBirthrate = this.cell.birthrate * musicFactor;
     if (this.emitter.reactsToBass) {
       effBirthrate *= (1.0 + kickPulse * (this.bass.birthrateMultiplier - 1.0));
     }
 
-    // Velocity multiplier
-    let velMultiplier = 1.0;
+    // Velocity multiplier: decelerates towards 0 (rest) as music fades
+    let velMultiplier = Math.pow(musicFactor, 1.25);
     if (this.emitter.reactsToBass) {
-      velMultiplier = 1.0 + kickPulse * (this.bass.velocityMultiplier - 1.0);
+      velMultiplier *= (1.0 + kickPulse * (this.bass.velocityMultiplier - 1.0));
     }
 
     // Spawn new particles according to birthrate
@@ -430,6 +438,11 @@ class ParticleSystem {
 
     const preserveDepth = this.emitter.preserveDepth;
     const fov = 450;
+    const musicFactor = Math.min(1.0, (this.musicEnergy || 0) * 1.5);
+    if (musicFactor <= 0.005) {
+      ctx.restore();
+      return;
+    }
 
     // Depth sorting when preserveDepth is active
     const renderList = preserveDepth
@@ -447,12 +460,12 @@ class ParticleSystem {
         drawX = centerX + p.x * scaleFactor;
         drawY = centerY + p.y * scaleFactor;
         drawSize = p.scale * scaleFactor;
-        drawAlpha = Math.min(1.0, p.alpha * Math.min(1.4, scaleFactor));
+        drawAlpha = Math.min(1.0, p.alpha * Math.min(1.4, scaleFactor)) * musicFactor;
       } else {
         drawX = centerX + p.x;
         drawY = centerY + p.y;
         drawSize = p.scale;
-        drawAlpha = p.alpha;
+        drawAlpha = p.alpha * musicFactor;
       }
 
       if (drawSize < 0.2) continue;
