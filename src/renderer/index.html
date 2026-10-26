@@ -1077,6 +1077,24 @@
         ["logoCA", "Logo chromatic split px", 0, 50, 0.5, 8, "Logo"],
         ["logoCABoost", "Logo CA bass boost ×", 0, 8, 0.1, 1.5, "Logo"],
         ["logoCAAngle", "Logo CA angle °", 0, 360, 1, 0, "Logo"],
+        ["ltOn", "Enabled", 0, 1, 1, 1, "Lightning"],
+        [
+          "ltBand",
+          "Trigger band",
+          0,
+          2,
+          1,
+          0,
+          "Lightning",
+          ["Bass", "Mid", "Treble"],
+        ],
+        ["ltThresh", "Sensitivity threshold", 0.05, 0.95, 0.01, 0.35, "Lightning"],
+        ["ltCount", "Bolt count", 1, 16, 1, 6, "Lightning"],
+        ["ltBranch", "Branching chance", 0, 1, 0.05, 0.55, "Lightning"],
+        ["ltJagged", "Jaggedness", 5, 80, 1, 32, "Lightning"],
+        ["ltWidth", "Bolt thickness", 0.5, 12, 0.5, 3.2, "Lightning"],
+        ["ltGlow", "Glow intensity", 0.2, 4, 0.1, 1.8, "Lightning"],
+        ["ltReach", "Strike reach", 0.5, 3, 0.1, 1.4, "Lightning"],
       ];
       const RAINBOW = [
         "#ffffff",
@@ -1107,7 +1125,11 @@
       try {
         saved = JSON.parse(localStorage.getItem("tnv")) || {};
       } catch {}
-      const params = { colors: saved.colors || [...DEFAULT_COLORS] };
+      const params = {
+        colors: saved.colors || [...DEFAULT_COLORS],
+        ltColor1: saved.ltColor1 || "#00f0ff",
+        ltColor2: saved.ltColor2 || "#bf00ff",
+      };
       window.params = params;
       const save = () => {
         try {
@@ -1209,6 +1231,72 @@
         }
       }
       buildColors();
+
+      // Neon Lightning Palettes
+      const LIGHTNING_PALETTES = {
+        "⚡ Neon Cyan & Violet": ["#00f0ff", "#bf00ff"],
+        "⚡ Electric Blue & Cyan": ["#0066ff", "#00ffff"],
+        "⚡ Cyberpunk Pink & Violet": ["#ff00aa", "#a855f7"],
+        "⚡ Golden Thunderbolt": ["#ffd700", "#ff6600"],
+        "⚡ Toxic Acid Green": ["#00ff66", "#00f0ff"],
+        "⚡ High-Voltage White": ["#ffffff", "#7dd3fc"],
+        "⚡ Crimson Voltage": ["#ff1744", "#ff5252"],
+      };
+
+      function buildLightningColors() {
+        const box = groups["Lightning"];
+        if (!box) return;
+        const colorRow = document.createElement("div");
+        colorRow.className = "lightning-color-controls";
+        colorRow.style.padding = "8px 0 4px";
+        colorRow.style.borderTop = "1px solid rgba(255,255,255,0.08)";
+        colorRow.style.marginTop = "8px";
+        colorRow.innerHTML = `
+          <div class="sub" style="margin: 4px 0 6px; font-weight: 600; color: #00f0ff;">⚡ Lightning Color Palette</div>
+          <div class="flex" style="margin-bottom: 8px;">
+            <select id="ltPalette" aria-label="Lightning color palette" style="flex: 1; padding: 5px 8px; font-size: 11.5px; background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(0,240,255,0.35); border-radius: 4px;">
+              <option value="">⚡ Neon Lightning Palettes…</option>
+              ${Object.keys(LIGHTNING_PALETTES).map((k) => `<option value="${k}">${k}</option>`).join("")}
+            </select>
+          </div>
+          <div class="row" style="display: flex; justify-content: space-between; align-items: center; margin: 4px 0;">
+            <span style="font-size: 12px;">Primary Arc</span>
+            <input type="color" id="ltColor1" value="${params.ltColor1 || "#00f0ff"}" style="cursor: pointer; width: 44px; height: 26px; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; background: none;">
+          </div>
+          <div class="row" style="display: flex; justify-content: space-between; align-items: center; margin: 4px 0;">
+            <span style="font-size: 12px;">Secondary Arc</span>
+            <input type="color" id="ltColor2" value="${params.ltColor2 || "#bf00ff"}" style="cursor: pointer; width: 44px; height: 26px; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; background: none;">
+          </div>
+        `;
+        box.append(colorRow);
+
+        const sel = colorRow.querySelector("#ltPalette");
+        const c1 = colorRow.querySelector("#ltColor1");
+        const c2 = colorRow.querySelector("#ltColor2");
+
+        sel.onchange = () => {
+          const pal = LIGHTNING_PALETTES[sel.value];
+          if (pal) {
+            params.ltColor1 = pal[0];
+            params.ltColor2 = pal[1];
+            c1.value = pal[0];
+            c2.value = pal[1];
+            save();
+          }
+        };
+
+        c1.oninput = () => {
+          params.ltColor1 = c1.value;
+          save();
+        };
+
+        c2.oninput = () => {
+          params.ltColor2 = c2.value;
+          save();
+        };
+      }
+      buildLightningColors();
+
       // palettes set the layer colors (front → back) and the layer count in one go
       const PALETTES = {
         Crimson: DEFAULT_COLORS.slice(0, 6),
@@ -2497,6 +2585,10 @@ void main() {
         hist = [],
         bass = 0,
         bassPeak = 0,
+        mid = 0,
+        midPeak = 0,
+        treble = 0,
+        treblePeak = 0,
         musicEnergy = 0;
       function analyse(dt) {
         const n = params.bands | 0;
@@ -2506,6 +2598,8 @@ void main() {
         }
         const raw = new Float32Array(n);
         let bassRaw = 0;
+        let midRaw = 0;
+        let trebleRaw = 0;
         let bandSum = 0;
         if (analyser && clock.playing()) {
           analyser.smoothingTimeConstant = params.smooth;
@@ -2531,9 +2625,24 @@ void main() {
             );
             bandSum += raw[i];
           }
+          // Bass range
           const bEnd = Math.max(1, Math.round(params.bassHz / binHz));
           for (let j = 1; j <= bEnd; j++) bassRaw += freq[j];
           bassRaw = bassRaw / bEnd / 255;
+
+          // Mid range (vocals, leads, synths, snares: ~250 Hz to 3500 Hz)
+          const mStart = bEnd + 1;
+          const mEnd = Math.min(freq.length - 1, Math.max(mStart + 1, Math.round(3500 / binHz)));
+          let midSum = 0;
+          for (let j = mStart; j <= mEnd; j++) midSum += freq[j];
+          midRaw = (mEnd >= mStart) ? (midSum / (mEnd - mStart + 1) / 255) : 0;
+
+          // Treble range (hi-hats, cymbals, air, percussion: ~3500 Hz to 16000 Hz)
+          const tStart = mEnd + 1;
+          const tEnd = Math.min(freq.length - 1, Math.max(tStart + 1, Math.round(16000 / binHz)));
+          let trbSum = 0;
+          for (let j = tStart; j <= tEnd; j++) trbSum += freq[j];
+          trebleRaw = (tEnd >= tStart) ? (trbSum / (tEnd - tStart + 1) / 255) : 0;
         }
         // spatial smoothing; ends reflect (they're the mirror seams)
         for (let p = 0; p < params.blur; p++) {
@@ -2554,8 +2663,19 @@ void main() {
           (bassRaw - bass) *
           (bassRaw > bass ? 0.7 : 0.18) *
           Math.min(1, dt * 60);
-        // kick is relative to the song's recent bass peak, so it adapts to any mix loudness
         bassPeak = Math.max(bass, bassPeak * Math.pow(0.995, dt * 60), 0.05);
+
+        mid +=
+          (midRaw - mid) *
+          (midRaw > mid ? 0.75 : 0.2) *
+          Math.min(1, dt * 60);
+        midPeak = Math.max(mid, midPeak * Math.pow(0.995, dt * 60), 0.05);
+
+        treble +=
+          (trebleRaw - treble) *
+          (trebleRaw > treble ? 0.8 : 0.22) *
+          Math.min(1, dt * 60);
+        treblePeak = Math.max(treble, treblePeak * Math.pow(0.995, dt * 60), 0.05);
 
         // Continuous musical envelope tracking:
         // Quickly catches audio onset, gracefully decays to 0 when audio fades out or pauses
@@ -2569,6 +2689,180 @@ void main() {
         if ((!analyser || !clock.playing()) && musicEnergy < 0.002) musicEnergy = 0;
 
         return clamp((bass / bassPeak - params.thresh) / (1 - params.thresh));
+      }
+
+      function getLightningTrigger() {
+        if (!params.ltOn) return 0;
+        const thresh = params.ltThresh !== undefined ? params.ltThresh : 0.35;
+        let val = 0;
+        if (params.ltBand === 1) {
+          // Mid band trigger
+          val = clamp((mid / midPeak - thresh) / (1 - thresh));
+        } else if (params.ltBand === 2) {
+          // Treble band trigger
+          val = clamp((treble / treblePeak - thresh) / (1 - thresh));
+        } else {
+          // Bass band trigger
+          val = clamp((bass / bassPeak - thresh) / (1 - thresh));
+        }
+        return val;
+      }
+
+      // ---------- Dynamic Electric Lightning Generator ----------
+      let lightningBolts = [];
+      let ltSpawnTimer = 0;
+
+      function subdivideLightning(x0, y0, x1, y1, depth, maxDepth, branchChance, jaggedness, targetSegments) {
+        if (depth >= maxDepth) {
+          targetSegments.push([x0, y0, x1, y1, Math.max(0.2, 1.0 - (depth / (maxDepth + 1.5)))]);
+          return;
+        }
+        const dx = x1 - x0;
+        const dy = y1 - y0;
+        const len = Math.hypot(dx, dy) || 1;
+        const midX = (x0 + x1) * 0.5;
+        const midY = (y0 + y1) * 0.5;
+        const perpX = -dy / len;
+        const perpY = dx / len;
+        const disp = (Math.random() * 2 - 1) * jaggedness * (len / 110);
+        const jx = midX + perpX * disp;
+        const jy = midY + perpY * disp;
+
+        subdivideLightning(x0, y0, jx, jy, depth + 1, maxDepth, branchChance, jaggedness, targetSegments);
+        subdivideLightning(jx, jy, x1, y1, depth + 1, maxDepth, branchChance, jaggedness, targetSegments);
+
+        // Branching fork
+        if (Math.random() < branchChance && depth <= 3) {
+          const forkAngle = (Math.random() - 0.5) * 0.9;
+          const bLen = len * (0.35 + Math.random() * 0.35);
+          const cosA = Math.cos(forkAngle);
+          const sinA = Math.sin(forkAngle);
+          const bdx = ((dx * cosA - dy * sinA) / len) * bLen;
+          const bdy = ((dx * sinA + dy * cosA) / len) * bLen;
+          subdivideLightning(jx, jy, jx + bdx, jy + bdy, depth + 1, maxDepth, branchChance * 0.35, jaggedness, targetSegments);
+        }
+      }
+
+      function updateLightning(dt, cx, cy, R, trigger, musicFactor) {
+        for (let i = lightningBolts.length - 1; i >= 0; i--) {
+          const b = lightningBolts[i];
+          b.age += dt;
+          if (b.age >= b.lifetime) {
+            lightningBolts.splice(i, 1);
+          }
+        }
+        if (!params.ltOn || musicFactor <= 0.01) return;
+
+        ltSpawnTimer += dt;
+        const maxBolts = params.ltCount || 6;
+        if (trigger > 0.05 && (ltSpawnTimer >= 0.032 || trigger > 0.55)) {
+          ltSpawnTimer = 0;
+          const toSpawn = Math.min(maxBolts - lightningBolts.length, Math.ceil(trigger * maxBolts));
+          const reachMult = (params.ltReach || 1.4) * (0.7 + trigger * 0.9);
+          const jaggedness = params.ltJagged || 32;
+          const branchChance = params.ltBranch || 0.55;
+
+          for (let k = 0; k < toSpawn; k++) {
+            const angle = Math.random() * Math.PI * 2;
+            const startDist = R * (0.85 + Math.random() * 0.2);
+            const x0 = cx + Math.cos(angle) * startDist;
+            const y0 = cy + Math.sin(angle) * startDist;
+
+            const isArcAcross = Math.random() < 0.22;
+            let x1, y1;
+            if (isArcAcross) {
+              const endAngle = angle + (Math.random() > 0.5 ? 1 : -1) * (0.5 + Math.random() * 1.5);
+              x1 = cx + Math.cos(endAngle) * startDist;
+              y1 = cy + Math.sin(endAngle) * startDist;
+            } else {
+              const strikeDist = startDist + (R * reachMult * (0.45 + Math.random() * 0.85));
+              const spreadAngle = angle + (Math.random() - 0.5) * 0.75;
+              x1 = cx + Math.cos(spreadAngle) * strikeDist;
+              y1 = cy + Math.sin(spreadAngle) * strikeDist;
+            }
+
+            const segments = [];
+            subdivideLightning(x0, y0, x1, y1, 0, 5, branchChance, jaggedness, segments);
+            const useColor2 = Math.random() < 0.45;
+            const hexCol = useColor2 ? (params.ltColor2 || "#bf00ff") : (params.ltColor1 || "#00f0ff");
+
+            lightningBolts.push({
+              segments,
+              age: 0,
+              lifetime: 0.05 + Math.random() * 0.08,
+              color: rgb(hexCol),
+              intensity: trigger
+            });
+          }
+        }
+      }
+
+      function buildLightningGeometry(u, musicAlpha) {
+        if (!params.ltOn || lightningBolts.length === 0 || musicAlpha <= 0.005) {
+          return [];
+        }
+        const drawBatches = [];
+        const baseWidth = (params.ltWidth || 3.2) * u;
+        const glowMult = params.ltGlow || 1.8;
+
+        for (const bolt of lightningBolts) {
+          const lifeProgress = bolt.age / bolt.lifetime;
+          const boltFade = (1.0 - lifeProgress) * musicAlpha;
+          if (boltFade <= 0.01) continue;
+
+          // 1. Halo strip (in bolt.color)
+          const haloStart = gi / 3;
+          const haloAlpha = clamp(boltFade * 0.65 * glowMult);
+          const haloW = baseWidth * 2.2;
+          for (const [x0, y0, x1, y1, taper] of bolt.segments) {
+            const dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy) || 1;
+            const nx = (-dy / len) * haloW * taper;
+            const ny = (dx / len) * haloW * taper;
+            const a = haloAlpha * taper;
+            vtx(x0 - nx, y0 - ny, a);
+            vtx(x0 + nx, y0 + ny, a);
+            vtx(x1 - nx, y1 - ny, a);
+            vtx(x0 + nx, y0 + ny, a);
+            vtx(x1 + nx, y1 + ny, a);
+            vtx(x1 - nx, y1 - ny, a);
+          }
+          const haloCount = gi / 3 - haloStart;
+          if (haloCount > 0) {
+            drawBatches.push({
+              color: bolt.color,
+              start: haloStart,
+              count: haloCount,
+              alpha: 1.0
+            });
+          }
+
+          // 2. High-intensity electric core strip (bright white/tinted core)
+          const coreStart = gi / 3;
+          const coreAlpha = clamp(boltFade * 0.95);
+          const coreW = baseWidth * 0.65;
+          for (const [x0, y0, x1, y1, taper] of bolt.segments) {
+            const dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy) || 1;
+            const nx = (-dy / len) * coreW * taper;
+            const ny = (dx / len) * coreW * taper;
+            const a = coreAlpha * taper;
+            vtx(x0 - nx, y0 - ny, a);
+            vtx(x0 + nx, y0 + ny, a);
+            vtx(x1 - nx, y1 - ny, a);
+            vtx(x0 + nx, y0 + ny, a);
+            vtx(x1 + nx, y1 + ny, a);
+            vtx(x1 - nx, y1 - ny, a);
+          }
+          const coreCount = gi / 3 - coreStart;
+          if (coreCount > 0) {
+            drawBatches.push({
+              color: [1.0, 1.0, 1.0],
+              start: coreStart,
+              count: coreCount,
+              alpha: 1.0
+            });
+          }
+        }
+        return drawBatches;
       }
 
       // ---------- Drops (marked by hand in the drop editor) ----------
@@ -3346,21 +3640,29 @@ void main() {
           }
         }
 
-        // wind strips, then the spectrum layers back (most delayed) to front, into one vertex buffer
+        // wind strips, lightning arcs, then the spectrum layers back (most delayed) to front, into one vertex buffer
         geo = grow(
           geo,
           params.wCount * 576 +
-            params.layers * (2 * cur.length * RING_STEPS + 2) * 3,
+            params.layers * (2 * cur.length * RING_STEPS + 2) * 3 +
+            35000,
         );
         gi = 0;
         if (musicAlpha > 0.002) {
           windStrips(cx, cy, D, spread, kick, dt, t, burst, musicSpeed, musicAlpha);
         }
-        const windN = gi / 3,
-          layers = [];
+        const windN = gi / 3;
+
         const scale = (1 + kick * params.pulse) * is,
           R = params.radius * u * scale,
           Hh = params.height * u * (1 + env * params.dRing) * is;
+
+        // Dynamic electric lightning geometry
+        const ltTrigger = getLightningTrigger();
+        updateLightning(dt, cx, cy, R, ltTrigger, musicFactor);
+        const ltBatches = buildLightningGeometry(u, musicAlpha);
+
+        const layers = [];
         for (let L = params.layers - 1; L >= 0; L--) {
           const arr = hist[Math.min(hist.length - 1, L * params.delay)];
           if (!arr) continue;
@@ -3472,7 +3774,14 @@ void main() {
         // 2. Crisp wind lines (isolated from chromatic aberration)
         if (windN) flat(gl.TRIANGLES, 0, windN, undefined, cam, fade * musicAlpha);
 
-        // 3. Center logo with dedicated logo chromatic aberration
+        // 3. Crisp Electric Lightning Arcs (isolated from chromatic aberration, additive glow)
+        if (ltBatches && ltBatches.length > 0) {
+          for (const b of ltBatches) {
+            flat(gl.TRIANGLES, b.start, b.count, b.color, ringCam, b.alpha);
+          }
+        }
+
+        // 4. Center logo with dedicated logo chromatic aberration
         syncLogo(t);
         if (R > 0) {
           const lcaAmt = (params.logoCA || 0) * (1 + kick * (params.logoCABoost || 0));
@@ -3630,7 +3939,12 @@ void main() {
         hist = [];
         bass = 0;
         bassPeak = 0;
+        mid = 0;
+        midPeak = 0;
+        treble = 0;
+        treblePeak = 0;
         musicEnergy = 0;
+        lightningBolts = [];
         drop = 0;
         prevT = 0;
         testDropAt = 0;
