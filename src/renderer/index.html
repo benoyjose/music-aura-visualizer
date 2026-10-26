@@ -135,10 +135,25 @@
       input[type="number"],
       select {
         background: var(--field);
+        color: var(--text);
         border: 1px solid var(--edge);
         border-radius: 7px;
         padding: 6px 8px;
         min-width: 0;
+      }
+      select {
+        cursor: pointer;
+      }
+      select option,
+      select optgroup {
+        background-color: #161622 !important;
+        color: #ffffff !important;
+        padding: 6px 10px;
+      }
+      select option:hover,
+      select option:checked {
+        background-color: #272738 !important;
+        color: #00f0ff !important;
       }
       input[type="text"] {
         flex: 1;
@@ -997,6 +1012,24 @@
         ["wWiggle", "Wiggle speed", 0, 15, 0.1, 5, "Wind lines"],
         ["wWidth", "Thickness", 0.3, 10, 0.1, 6.9, "Wind lines"],
         ["wAlpha", "Opacity", 0, 1, 0.01, 0.21, "Wind lines"],
+        ["ltOn", "Enabled", 0, 1, 1, 1, "Lightning"],
+        [
+          "ltBand",
+          "Trigger",
+          0,
+          2,
+          1,
+          0,
+          "Lightning",
+          ["Bass", "Mid", "Treble"],
+        ],
+        ["ltThresh", "Threshold", 0.05, 0.95, 0.01, 0.35, "Lightning"],
+        ["ltCount", "Count", 1, 16, 1, 6, "Lightning"],
+        ["ltBranch", "Branching", 0, 1, 0.05, 0.55, "Lightning"],
+        ["ltJagged", "Jaggedness", 5, 80, 1, 32, "Lightning"],
+        ["ltWidth", "Thickness", 0.5, 12, 0.5, 3.2, "Lightning"],
+        ["ltGlow", "Glow", 0.2, 4, 0.1, 1.8, "Lightning"],
+        ["ltReach", "Length", 0.5, 3, 0.1, 1.4, "Lightning"],
         ["camSway", "Sway °", 0, 15, 0.1, 1.5, "Camera"],
         ["camSpeed", "Sway speed", 0, 2, 0.01, 0, "Camera"],
         ["camKick", "Bass tilt °", 0, 15, 0.1, 2.4, "Camera"],
@@ -1077,24 +1110,6 @@
         ["logoCA", "Logo chromatic split px", 0, 50, 0.5, 8, "Logo"],
         ["logoCABoost", "Logo CA bass boost ×", 0, 8, 0.1, 1.5, "Logo"],
         ["logoCAAngle", "Logo CA angle °", 0, 360, 1, 0, "Logo"],
-        ["ltOn", "Enabled", 0, 1, 1, 1, "Lightning"],
-        [
-          "ltBand",
-          "Trigger band",
-          0,
-          2,
-          1,
-          0,
-          "Lightning",
-          ["Bass", "Mid", "Treble"],
-        ],
-        ["ltThresh", "Sensitivity threshold", 0.05, 0.95, 0.01, 0.35, "Lightning"],
-        ["ltCount", "Bolt count", 1, 16, 1, 6, "Lightning"],
-        ["ltBranch", "Branching chance", 0, 1, 0.05, 0.55, "Lightning"],
-        ["ltJagged", "Jaggedness", 5, 80, 1, 32, "Lightning"],
-        ["ltWidth", "Bolt thickness", 0.5, 12, 0.5, 3.2, "Lightning"],
-        ["ltGlow", "Glow intensity", 0.2, 4, 0.1, 1.8, "Lightning"],
-        ["ltReach", "Strike reach", 0.5, 3, 0.1, 1.4, "Lightning"],
       ];
       const RAINBOW = [
         "#ffffff",
@@ -1234,38 +1249,34 @@
 
       // Neon Lightning Palettes
       const LIGHTNING_PALETTES = {
-        "⚡ Neon Cyan & Violet": ["#00f0ff", "#bf00ff"],
-        "⚡ Electric Blue & Cyan": ["#0066ff", "#00ffff"],
-        "⚡ Cyberpunk Pink & Violet": ["#ff00aa", "#a855f7"],
-        "⚡ Golden Thunderbolt": ["#ffd700", "#ff6600"],
-        "⚡ Toxic Acid Green": ["#00ff66", "#00f0ff"],
-        "⚡ High-Voltage White": ["#ffffff", "#7dd3fc"],
-        "⚡ Crimson Voltage": ["#ff1744", "#ff5252"],
+        "Neon Cyan & Violet": ["#00f0ff", "#bf00ff"],
+        "Electric Blue & Cyan": ["#0066ff", "#00ffff"],
+        "Cyberpunk Pink & Violet": ["#ff00aa", "#a855f7"],
+        "Golden Thunderbolt": ["#ffd700", "#ff6600"],
+        "Toxic Acid Green": ["#00ff66", "#00f0ff"],
+        "High-Voltage White": ["#ffffff", "#7dd3fc"],
+        "Crimson Voltage": ["#ff1744", "#ff5252"],
       };
 
       function buildLightningColors() {
         const box = groups["Lightning"];
         if (!box) return;
         const colorRow = document.createElement("div");
-        colorRow.className = "lightning-color-controls";
-        colorRow.style.padding = "8px 0 4px";
-        colorRow.style.borderTop = "1px solid rgba(255,255,255,0.08)";
-        colorRow.style.marginTop = "8px";
         colorRow.innerHTML = `
-          <div class="sub" style="margin: 4px 0 6px; font-weight: 600; color: #00f0ff;">⚡ Lightning Color Palette</div>
-          <div class="flex" style="margin-bottom: 8px;">
-            <select id="ltPalette" aria-label="Lightning color palette" style="flex: 1; padding: 5px 8px; font-size: 11.5px; background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(0,240,255,0.35); border-radius: 4px;">
-              <option value="">⚡ Neon Lightning Palettes…</option>
+          <div class="row">
+            <span>Color palette</span>
+            <select id="ltPalette" aria-label="Lightning color palette" style="max-width: 160px;">
+              <option value="">Palette…</option>
               ${Object.keys(LIGHTNING_PALETTES).map((k) => `<option value="${k}">${k}</option>`).join("")}
             </select>
           </div>
-          <div class="row" style="display: flex; justify-content: space-between; align-items: center; margin: 4px 0;">
-            <span style="font-size: 12px;">Primary Arc</span>
-            <input type="color" id="ltColor1" value="${params.ltColor1 || "#00f0ff"}" style="cursor: pointer; width: 44px; height: 26px; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; background: none;">
+          <div class="row">
+            <span>Primary arc</span>
+            <input type="color" id="ltColor1" value="${params.ltColor1 || "#00f0ff"}">
           </div>
-          <div class="row" style="display: flex; justify-content: space-between; align-items: center; margin: 4px 0;">
-            <span style="font-size: 12px;">Secondary Arc</span>
-            <input type="color" id="ltColor2" value="${params.ltColor2 || "#bf00ff"}" style="cursor: pointer; width: 44px; height: 26px; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; background: none;">
+          <div class="row">
+            <span>Secondary arc</span>
+            <input type="color" id="ltColor2" value="${params.ltColor2 || "#bf00ff"}">
           </div>
         `;
         box.append(colorRow);
@@ -3317,15 +3328,18 @@ void main() {
             continue;
           }
           const near = 1 - Math.min(1, s.z); // grows 0→1 as the line approaches, like particle size
-          const amp = params.wAmp * u * s.a * (0.4 + near),
-            k = (params.wWaves * 2 * Math.PI) / len,
-            ph = s.ph + t * params.wWiggle * (0.1 + 0.9 * mSpeed);
+          const amp = params.wAmp * u * s.a * (0.4 + near) * Math.min(1, mAlpha * 1.2),
+            lenSafe = Math.max(2, len),
+            k = (params.wWaves * 2 * Math.PI) / lenSafe;
+          // Smooth continuous phase accumulation avoids instantaneous phase jumps from dynamic mSpeed fluctuations
+          s.ph = ((s.ph || 0) + dt * params.wWiggle * (0.2 + 0.8 * mSpeed)) % (Math.PI * 2000);
+          const ph = s.ph;
           const hw = (params.wWidth * u * (0.5 + near)) / 2,
             A = params.wAlpha * clamp(near * 2.5) * mAlpha;
           for (let i = 0; i <= 32; i++) {
             const f = i / 32,
               r = r0 + f * len,
-              w = amp * Math.sin(Math.PI * f) * Math.sin(k * f * len - ph); // ends pinned to the path
+              w = amp * Math.sin(Math.PI * f) * Math.sin(k * f * lenSafe - ph); // ends pinned to the path
             wx[i] = cx + s.dx * r - s.dy * w;
             wy[i] = cy + s.dy * r + s.dx * w;
           }
