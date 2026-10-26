@@ -71,21 +71,30 @@ class VideoExporter {
       encoderArgs = ['-c:v', 'libx264', '-preset', 'fast', '-crf', String(crf)];
     }
 
-    // Determine audio encoder (preserving high-resolution audio)
+    // Determine audio encoder (preserving high-resolution audio, YouTube compatible)
     let audioEncodingArgs = [];
+    const isWav = audioPath && audioPath.toLowerCase().endsWith('.wav');
+    const isMp4 = outputPath && outputPath.toLowerCase().endsWith('.mp4');
+
     if (audioCodec === 'copy') {
-      // Direct stream copy: 100% bit-for-bit lossless preservation of high-res WAV, FLAC, MP3, AAC
-      audioEncodingArgs = ['-c:a', 'copy'];
+      if (isWav && isMp4) {
+        // Standard MP4 containers do not support raw PCM streams.
+        // YouTube recommends AAC-LC at 384k/512k stereo, 48kHz for high-res audio:
+        audioEncodingArgs = ['-c:a', 'aac', '-b:a', '384k', '-ar', '48000'];
+      } else {
+        // Direct stream copy: 100% bit-for-bit lossless preservation of high-res audio in MOV/MKV, or AAC/FLAC
+        audioEncodingArgs = ['-c:a', 'copy'];
+      }
     } else if (audioCodec === 'alac') {
       // Apple Lossless 24-bit PCM compression in MP4
       audioEncodingArgs = ['-c:a', 'alac'];
     } else if (audioCodec === 'flac') {
       audioEncodingArgs = ['-c:a', 'flac'];
     } else if (audioCodec === 'aac_512') {
-      audioEncodingArgs = ['-c:a', 'aac', '-b:a', '512k'];
+      audioEncodingArgs = ['-c:a', 'aac', '-b:a', '512k', '-ar', '48000'];
     } else {
-      // High quality 320k AAC
-      audioEncodingArgs = ['-c:a', 'aac', '-b:a', '320k'];
+      // High quality 320k/384k AAC (YouTube compatible)
+      audioEncodingArgs = ['-c:a', 'aac', '-b:a', '384k', '-ar', '48000'];
     }
 
     // Input args for piped video

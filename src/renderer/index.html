@@ -3756,17 +3756,23 @@ void main() {
         if (!(await VideoEncoder.isConfigSupported(vcfg)).supported)
           throw new Error(`Video encoder at ${w}×${h} isn't supported by your GPU driver`);
         let acfg = null;
+        // YouTube studio recommended audio bitrates: 384 kbps (highest broadcast stereo), fallback to 320k, 256k, 192k
         for (const codec of ["mp4a.40.2", "opus"]) {
-          const c = {
-            codec,
-            sampleRate: sr,
-            numberOfChannels: ch,
-            bitrate: 192000,
-          };
-          if ((await AudioEncoder.isConfigSupported(c)).supported) {
-            acfg = c;
-            break;
+          for (const b of [384000, 320000, 256000, 192000]) {
+            const c = {
+              codec,
+              sampleRate: sr,
+              numberOfChannels: ch,
+              bitrate: b,
+            };
+            try {
+              if ((await AudioEncoder.isConfigSupported(c)).supported) {
+                acfg = c;
+                break;
+              }
+            } catch (_) {}
           }
+          if (acfg) break;
         }
         if (!acfg) throw new Error("no supported audio encoder (AAC or Opus)");
 
